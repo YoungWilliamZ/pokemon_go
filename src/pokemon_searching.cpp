@@ -4,8 +4,17 @@
 #include <sensor_msgs/image_encodings.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/core/core.hpp>
+#include <std_msgs/Int32.h>
+#include <std_msgs/Float32MultiArray.h>
+#include <std_msgs/Bool.h>
+
+using namespace cv;
+using namespace std;
 
 static const std::string OPENCV_WINDOW = "Pokemon Search";
+
+
 
 class ImageConverter
 {
@@ -13,16 +22,20 @@ class ImageConverter
   image_transport::ImageTransport it_;
   image_transport::Subscriber image_sub_;
   image_transport::Publisher image_pub_;
+  ros::Subscriber save_sub_;
+  int fileNum;
+  Mat img;
+  int count;
 
 public:
   ImageConverter()
-    : it_(nh_)
+    : it_(nh_), fileNum(0), count(0)
   {
     // Subscribe to input video feed and publish output video feed
     image_sub_ = it_.subscribe("/camera/rgb/image_raw", 1,
       &ImageConverter::imageCb, this);
     image_pub_ = it_.advertise("/pokemon_go/searcher", 1);
-
+    save_sub_ = nh_.subscribe("/pokemon_go/save", 1, &ImageConverter::saveImg, this);
     cv::namedWindow(OPENCV_WINDOW);
   }
 
@@ -31,8 +44,21 @@ public:
     cv::destroyWindow(OPENCV_WINDOW);
   }
 
+  void saveImg(std_msgs::Bool save){
+    ROS_INFO("Catch the pokemon!");
+	  if(save.data){
+      stringstream stream;
+          stream <<"/home/youngwilliam/catkin_ws/src/pokemon_go/image/pokemon" << fileNum <<".jpg";
+      imwrite(stream.str(),img);
+      cout <<"pokemon" << fileNum << " had Saved."<< endl;
+      fileNum++;
+	  }
+  }
+
   void imageCb(const sensor_msgs::ImageConstPtr& msg)
   {
+    // ROS_INFO("Start searching: time = [%d]", ++count);
+
     cv_bridge::CvImagePtr cv_ptr;
     try
     {
@@ -44,6 +70,7 @@ public:
       return;
     }
 
+    img = cv_ptr->image;
     // Draw an target square on the video stream
     int height = cv_ptr->image.rows;
     int width = cv_ptr->image.cols;
